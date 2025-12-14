@@ -1,20 +1,58 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\ShooterController;
+use App\Http\Controllers\TargetController;
+use App\Http\Controllers\MappingController;
 
+/*
+|--------------------------------------------------------------------------
+| Public Route (Redirect to login)
+|--------------------------------------------------------------------------
+*/
 Route::get('/', function () {
-    return view('welcome');
+    return redirect()->route('login');
 });
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
 
-Route::middleware('auth')->group(function () {
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+/*
+|--------------------------------------------------------------------------
+| Authenticated Routes
+|--------------------------------------------------------------------------
+*/
+
+// Dashboard — visible to ALL logged-in users
+Route::middleware(['auth'])->group(function () {
+
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    // ADMIN + SUPER ADMIN
+    Route::middleware('role:super_admin,admin')->group(function () {
+        Route::resource('targets', TargetController::class);
+        Route::resource('mappings', MappingController::class);
+    });
+
+    // ONLY SUPER ADMIN
+    Route::middleware('role:super_admin')->group(function () {
+        Route::resource('users', UserController::class);
+        Route::resource('shooters', ShooterController::class);
+    });
 });
 
+
+// temp and test routes 
+Route::middleware('auth')->get('/test', fn()=> 'OK');
+Route::get('/logs', function () {
+    return 'Logs will come later';
+})->name('logs.index')->middleware('auth');
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Auth Routes (Breeze)
+|--------------------------------------------------------------------------
+*/
 require __DIR__.'/auth.php';
