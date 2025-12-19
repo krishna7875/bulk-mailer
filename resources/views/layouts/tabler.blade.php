@@ -18,6 +18,23 @@
 
     {{-- Livewire Styles --}}
     @livewireStyles
+
+    <style>
+        html {
+            overflow-y: scroll;
+        }
+
+        .pagination {
+            margin: 0;
+        }
+
+        .pagination .page-link {
+            padding: 2px 8px;
+            font-size: 0.75rem;
+            line-height: 1.2;
+        }
+
+    </style>
 </head>
 
 <body class="layout-fluid theme-light">
@@ -99,7 +116,7 @@
         {{-- MAIN CONTENT AREA --}}
         <div class="page-wrapper">
 
-            {{-- TOP NAVBAR --}}
+            {{-- TOP NAVBAR --}} 
             <header class="navbar navbar-expand-md navbar-light sticky-top d-print-none">
                 <div class="container-fluid">
 
@@ -113,26 +130,22 @@
                         {{-- USER DROPDOWN --}}
                         <div class="nav-item dropdown">
                             <a href="#" class="nav-link d-flex lh-1 text-reset p-0" data-bs-toggle="dropdown">
-                                {{-- User avatar --}}
-                                <span class="avatar avatar-sm">{{ strtoupper(auth()->user()->name[0]) }}</span>
+                                <span class="avatar avatar-sm">
+                                    {{ strtoupper(auth()->user()->name[0]) }}
+                                </span>
 
-                                <div class="d-none d-xl-block ps-2">
+                                <div class="d-none d-md-block ps-2">
                                     <div>{{ auth()->user()->name }}</div>
                                     <div class="small text-muted">{{ auth()->user()->role }}</div>
                                 </div>
                             </a>
 
                             <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
-
-                                <a href="#" class="dropdown-item">Profile</a>
-
                                 <form method="POST" action="{{ route('logout') }}">
                                     @csrf
                                     <button class="dropdown-item">Logout</button>
                                 </form>
-
                             </div>
-
                         </div>
 
                     </div>
@@ -141,8 +154,8 @@
             </header>
 
             {{-- CONTENT WRAPPER --}}
-            <div class="page-body">
-                <div class="container-xl py-3">
+            <div class="page-body pt-1">
+                <div class="container-xl py-1">
                     {{ $slot ?? '' }}
                     @yield('content')
                 </div>
@@ -158,6 +171,70 @@
 
     {{-- Livewire --}}
     @livewireScripts
+
+    <script>
+        window.addEventListener('notify', event => {
+            const { type, message } = event.detail;
+
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type} alert-dismissible fade show`;
+            alert.style.position = 'fixed';
+            alert.style.bottom = '20px';
+            alert.style.right = '20px';
+            alert.style.zIndex = 2000;
+            alert.style.minWidth = '260px';
+
+            alert.innerHTML = `
+                <strong>${message}</strong>
+                <button type="button" class="btn-close" onclick="this.parentElement.remove()"></button>
+            `;
+
+            document.body.appendChild(alert);
+
+            setTimeout(() => {
+                alert.classList.remove('show');
+                alert.remove();
+            }, 3000);
+        });
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script>
+        function confirmDelete(eventName, id, message = 'This record will be permanently deleted.') {
+            Swal.fire({
+                title: 'Are you sure?',
+                text: message,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d63939',
+                confirmButtonText: 'Yes, delete it',
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Livewire.dispatch(eventName, { id: id });
+                }
+            });
+        }
+    </script>
+
+    <script>
+        function confirmDeleteShooter(id) {
+            Swal.fire({
+                title: 'Are you sure?',
+                text: 'This action cannot be undone.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d63939',
+                confirmButtonText: 'Yes, delete it',
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Livewire.dispatch('deleteShooter', { id: id });
+                }
+            });
+        }
+    </script>
+
+
 
 </body>
 </html>

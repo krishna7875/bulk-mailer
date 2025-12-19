@@ -3,8 +3,8 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\UserController;
-use App\Http\Controllers\ShooterController;
-use App\Http\Controllers\TargetController;
+use App\Http\Controllers\Admin\ShooterController;
+use App\Http\Controllers\Admin\TargetController;
 use App\Http\Controllers\MappingController;
 
 /*
@@ -30,14 +30,16 @@ Route::middleware(['auth'])->group(function () {
 
     // ADMIN + SUPER ADMIN
     Route::middleware('role:super_admin,admin')->group(function () {
-        Route::resource('targets', TargetController::class);
         Route::resource('mappings', MappingController::class);
+        Route::get('/targets', [TargetController::class, 'index'])->name('targets.index');
     });
-
+    
     // ONLY SUPER ADMIN
     Route::middleware('role:super_admin')->group(function () {
         Route::resource('users', UserController::class);
-        Route::resource('shooters', ShooterController::class);
+        
+        Route::get('/targets', [TargetController::class, 'index'])->name('targets.index');
+        Route::get('/shooters', [ShooterController::class, 'index'])->name('shooters.index');
     });
 });
 
@@ -47,7 +49,6 @@ Route::middleware('auth')->get('/test', fn()=> 'OK');
 Route::get('/logs', function () {
     return 'Logs will come later';
 })->name('logs.index')->middleware('auth');
-
 
 
 /*
