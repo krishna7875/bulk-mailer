@@ -217,24 +217,6 @@
         }
     </script>
 
-    <script>
-        function confirmDeleteShooter(id) {
-            Swal.fire({
-                title: 'Are you sure?',
-                text: 'This action cannot be undone.',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d63939',
-                confirmButtonText: 'Yes, delete it',
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    Livewire.dispatch('deleteShooter', { id: id });
-                }
-            });
-        }
-
-    </script>
-
 <script>
     document.addEventListener('livewire:init', () => {
         console.log("AM HERE------1");
