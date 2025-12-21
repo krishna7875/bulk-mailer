@@ -5,7 +5,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\Admin\ShooterController;
 use App\Http\Controllers\Admin\TargetController;
-use App\Http\Controllers\MappingController;
+use App\Http\Controllers\Admin\MappingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -38,8 +38,11 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware('role:super_admin')->group(function () {
         Route::resource('users', UserController::class);
         
-        Route::get('/targets', [TargetController::class, 'index'])->name('targets.index');
         Route::get('/shooters', [ShooterController::class, 'index'])->name('shooters.index');
+        Route::get('/targets', [TargetController::class, 'index'])->name('targets.index');
+        Route::get('/mappings', [MappingController::class, 'index'])->middleware(['auth', 'role:admin,super_admin'])
+    ->name('mappings.index');
+
     });
 });
 

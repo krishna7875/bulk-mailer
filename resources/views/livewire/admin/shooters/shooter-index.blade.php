@@ -10,7 +10,9 @@
 
     <div class="d-flex justify-content-between align-items-center mb-1">
         <h2 class="page-title mb-0">Shooters</h2>
-        <button class="btn btn-primary btn-sm">Add Shooter</button>
+        <button class="btn btn-primary btn-sm" wire:click="$set('showModal', true)">
+            Add Shooter
+        </button>
     </div>
 
     <div class="card mt-1">

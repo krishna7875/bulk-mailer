@@ -9,10 +9,32 @@
 
     <div class="d-flex justify-content-between align-items-center mb-2">
         <h2 class="page-title mb-0">Targets</h2>
+
+            <div class="mb-2">
+        <form wire:submit.prevent="import" class="d-flex gap-2 align-items-center">
+            <input type="file"
+                class="form-control form-control-sm"
+                wire:model="importFile"
+                accept=".csv,.xlsx">
+
+            <button class="btn btn-sm btn-success"
+                    wire:loading.attr="disabled"
+                    wire:target="import">
+                Import
+            </button>
+        </form>
+
+        @error('importFile')
+            <small class="text-danger">{{ $message }}</small>
+        @enderror
+    </div>
+    
         <button class="btn btn-primary btn-sm" wire:click="$set('showModal', true)">
             Add Target
         </button>
     </div>
+
+
 
     <div class="card">
         <div class="table-responsive">

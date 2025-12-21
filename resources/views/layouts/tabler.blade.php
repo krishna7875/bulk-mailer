@@ -232,7 +232,24 @@
                 }
             });
         }
+
     </script>
+
+<script>
+    document.addEventListener('livewire:init', () => {
+        console.log("AM HERE------1");
+        Livewire.on('swal', (data) => {
+        console.log("AM HERE------2");
+        console.log(data[0]);
+            Swal.fire({
+                icon: data[0].type ?? 'info',
+                title: data[0].title ?? 'Info',
+                html: data[0].html ?? '',
+                confirmButtonColor: '#206bc4',
+            });
+        });
+    });
+</script>
 
 
 

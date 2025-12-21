@@ -13,19 +13,33 @@ return new class extends Migration
     {
         Schema::create('shooter_target_mappings', function (Blueprint $table) {
             $table->id();
+
             $table->foreignId('shooter_id')->constrained()->cascadeOnDelete();
             $table->foreignId('target_id')->constrained()->cascadeOnDelete();
 
-            $table->enum('status', ['pending', 'sent', 'failed'])->default('pending');
+            $table->date('assigned_date')->index();
+
+            $table->enum('status', [
+                'assigned',
+                'sent',
+                'failed'
+            ])->default('assigned');
 
             $table->timestamp('assigned_at')->nullable();
             $table->timestamp('attempted_at')->nullable();
             $table->timestamp('sent_at')->nullable();
 
+            $table->text('error_message')->nullable();
+
             $table->timestamps();
 
-            $table->unique(['shooter_id', 'target_id']); // prevent duplicates
+            // 👇 SHORT, MANUAL INDEX NAME (IMPORTANT)
+            $table->unique(
+                ['shooter_id', 'target_id', 'assigned_date'],
+                'uq_shooter_target_day'
+            );
         });
+
     }
 
     /**
