@@ -16,8 +16,11 @@ class ShooterIndex extends Component
         'searchEmail',
         'searchStatus',
     ];
-    protected $listeners = ['deleteShooter' => 'delete'];
 
+    protected $listeners = [
+        'deleteShooter' => 'delete',
+        'refreshShooters' => '$refresh',
+    ];
 
     public $showModal = false;
     public $shooterId = null;

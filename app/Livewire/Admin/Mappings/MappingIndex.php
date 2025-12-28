@@ -6,8 +6,12 @@ use Livewire\Component;
 use Livewire\WithPagination;
 use Illuminate\Support\Facades\DB;
 use App\Models\Shooter;
+use App\Models\ShooterTargetMapping;
 use App\Models\Target;
 use Carbon\Carbon;
+use App\Models\EmailTemplate;
+
+use Log;
 
 class MappingIndex extends Component
 {
@@ -20,50 +24,83 @@ class MappingIndex extends Component
     public string $assignedDate;
 
     // ===== Filters for list =====
-    public $filterShooter = '';
-    public $filterStatus = '';
-    public $filterDate = '';
-    
+    public ?int $filterShooter = null;
+    public ?string $filterStatus = null;
+    public ?string $filterDate = null;
+
+    public $emailTemplateId;
+    public $templates = [];
 
     protected $listeners = ['deleteMapping'];
 
-    public function updating($name, $value)
+    protected function rules()
     {
-        if (str_starts_with($name, 'filter')) {
+        return [
+            'shooterId'        => 'required|exists:shooters,id',
+            'emailTemplateId'  => 'required|exists:email_templates,id',
+            'assignedDate'     => 'required|date',
+        ];
+    }
+
+    public function updating($property)
+    {
+        Log::info('MappingIndex::updating()');
+        if (str_starts_with($property, 'filter')) {
             $this->resetPage();
         }
     }
     public function updated($property)
     {
+        Log::info('MappingIndex::updated()');
         if ($property === 'assignedDate') {
             $this->dispatch('$refresh');
         }
     }
     public function updatedAssignedDate()
     {
+        Log::info('MappingIndex::updatedAssignedDate()');
         $this->reset('selectedShooters');
         $this->resetPage();
     }
-
+    
     public function mount()
     {
+        Log::info('MappingIndex::mount()');
         $this->assignedDate = now()->toDateString();
         $this->filterDate  = now()->toDateString();
-    }
 
+        $this->templates = EmailTemplate::query()
+        ->where('status', 'active')
+        ->orderBy('name')
+        ->get(['id', 'name']);
+
+    }
+    
     /**
      * Generate mappings respecting daily quota
-     */
+    */
     public function generate()
     {
+        Log::info('MappingIndex::generate()');
+
         $this->validate([
-            'selectedShooters' => 'required|array|min:1',
-            'assignedDate'     => 'required|date',
+            'selectedShooters'  => 'required|array|min:1',
+            'assignedDate'      => 'required|date',
+            'emailTemplateId'   => 'required|exists:email_templates,id',
         ]);
 
         DB::beginTransaction();
 
         try {
+            if (!$this->emailTemplateId) {
+                $this->dispatch('swal', [
+                    'type'  => 'warning',
+                    'title' => 'Template Required',
+                    'html'  => 'Please select an email template before generating mappings.',
+                ]);
+                return;
+            }
+
             $date = Carbon::parse($this->assignedDate)->toDateString();
             $totalAssigned = 0;
 
@@ -109,6 +146,7 @@ class MappingIndex extends Component
                 $rows = $targets->map(fn ($targetId) => [
                     'shooter_id'    => $shooter->id,
                     'target_id'     => $targetId,
+                    'email_template_id' => $this->emailTemplateId,
                     'assigned_date' => $date,
                     'status'        => 'assigned',
                     'assigned_at'   => $now,
@@ -161,43 +199,101 @@ class MappingIndex extends Component
      * Delete mapping
      */
    
-    public function deleteMapping($payload)
-    {
-        $id = $payload['id'];
+    // public function deleteMapping($payload)
+    // {
+    //     $id = $payload['id'];
 
-        DB::table('shooter_target_mappings')->where('id', $id)->delete();
+    //     DB::table('shooter_target_mappings')->where('id', $id)->delete();
+
+    //     $this->dispatch('notify', type: 'success', message: 'Mapping deleted');
+    //     $this->resetPage();
+    // }
+
+    public function deleteMapping($id)
+    {
+        Log::info("MappingIndex::deleteMapping() : id = ".$id);
+
+        // DB::table('shooter_target_mappings')->where('id', $id)->delete();
+        ShooterTargetMapping::findOrFail($id)->delete();
+
 
         $this->dispatch('notify', type: 'success', message: 'Mapping deleted');
+
         $this->resetPage();
     }
+
+
+    protected function availableTargetsCount(): int
+    {
+        return \App\Models\Target::where('status', 'unsent')
+            ->whereDoesntHave('mappings', function ($q) {
+                $q->where('assigned_date', $this->assignedDate);
+            })
+            ->count();
+    }
+
 
     public function render()
     {
 
-        $availableTargetsCount = Target::where('status', 'unsent')
-            ->whereNotExists(function ($q) {
-                $q->select(DB::raw(1))
-                ->from('shooter_target_mappings as m')
-                ->whereColumn('m.target_id', 'targets.id')
-                ->whereDate('m.assigned_date', $this->assignedDate);
-            })
-            ->count();
+        logger()->info('Mapping filters', [
+            'shooter' => $this->filterShooter,
+            'status'  => $this->filterStatus,
+            'date'    => $this->filterDate,
+        ]);
+
+        $availableTargetsCount = $this->availableTargetsCount();
+        // $availableTargetsCount = Target::where('status', 'unsent')
+        //     ->whereNotExists(function ($q) {
+        //         $q->select(DB::raw(1))
+        //         ->from('shooter_target_mappings as m')
+        //         ->whereColumn('m.target_id', 'targets.id')
+        //         ->whereDate('m.assigned_date', $this->assignedDate);
+        //     })
+        //     ->count();
 
 
+
+        // $mappings = DB::table('shooter_target_mappings as m')
+        //     ->join('shooters as s', 's.id', '=', 'm.shooter_id')
+        //     ->join('targets as t', 't.id', '=', 'm.target_id')
+
+        //     ->when(!is_null($this->filterShooter), function ($q) {
+        //         $q->where('m.shooter_id', $this->filterShooter);
+        //     })
+
+        //     ->when(!is_null($this->filterStatus), function ($q) {
+        //         $q->where('m.status', $this->filterStatus);
+        //     })
+
+        //     ->when(!is_null($this->filterDate), function ($q) {
+        //         $q->whereDate('m.assigned_date', $this->filterDate);
+        //     })
+
+        //     ->select(
+        //         'm.id',
+        //         's.email as shooter_email',
+        //         't.email as target_email',
+        //         'm.status',
+        //         'm.assigned_date'
+        //     )
+        //     ->orderByDesc('m.id')
+        //     ->paginate(10);
 
         $mappings = DB::table('shooter_target_mappings as m')
             ->join('shooters as s', 's.id', '=', 'm.shooter_id')
             ->join('targets as t', 't.id', '=', 'm.target_id')
+            ->leftJoin('email_templates as et', 'et.id', '=', 'm.email_template_id') 
 
-            ->when($this->filterShooter !== '', fn ($q) =>
-                $q->where('m.shooter_id', $this->filterShooter)
-            )
+            ->when(!is_null($this->filterShooter), function ($q) {
+                $q->where('m.shooter_id', $this->filterShooter);
+            })
 
-            ->when($this->filterStatus !== '', fn ($q) =>
-                $q->where('m.status', $this->filterStatus)
-            )
+            ->when(!is_null($this->filterStatus), function ($q) {
+                $q->where('m.status', $this->filterStatus);
+            })
 
-            ->when($this->filterDate !== '', function ($q) {
+            ->when(!is_null($this->filterDate), function ($q) {
                 $q->whereDate('m.assigned_date', $this->filterDate);
             })
 
@@ -205,11 +301,13 @@ class MappingIndex extends Component
                 'm.id',
                 's.email as shooter_email',
                 't.email as target_email',
+                'et.name as template_name',
                 'm.status',
                 'm.assigned_date'
             )
             ->orderByDesc('m.id')
             ->paginate(10);
+
 
             $shooters = Shooter::where('status', 'active')
                 ->get()

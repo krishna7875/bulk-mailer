@@ -15,6 +15,10 @@ class Shooter extends Model
         'last_quota_date',
         'refresh_token',
         'status',
+        'gmail_access_token',
+        'gmail_refresh_token',
+        'gmail_token_expires_at',
+        'gmail_connected_at'
     ];
 
     protected $casts = [

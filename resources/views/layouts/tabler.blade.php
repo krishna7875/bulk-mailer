@@ -98,6 +98,39 @@
                             </a>
                         </li>
 
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('email-templates.*') ? 'active' : '' }}"
+                            href="{{ route('email-templates.index') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <i class="ti ti-mail"></i>
+                                </span>
+                                Email Templates
+                            </a>
+                        </li>
+
+                        {{-- REPORTS --}}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle"
+                            href="#navbar-reports"
+                            data-bs-toggle="dropdown"
+                            data-bs-auto-close="false"
+                            role="button"
+                            aria-expanded="false">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <i class="ti ti-chart-bar"></i>
+                                </span>
+                                Reports
+                            </a>
+
+                            <div class="dropdown-menu">
+                                <a class="dropdown-item"
+                                href="{{ route('reports.mappings') }}">
+                                    Mapping Report
+                                </a>
+                            </div>
+                        </li>
+
+
                         {{-- TEMP — Add only if route exists --}}
                         {{-- <li class="nav-item">
                             <a class="nav-link" href="{{ route('logs.index') }}">
@@ -215,6 +248,9 @@
                 }
             });
         }
+
+
+
     </script>
 
 <script>

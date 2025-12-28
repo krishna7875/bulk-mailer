@@ -30,4 +30,13 @@ class ShooterTargetMapping extends Model
     {
         return $this->belongsTo(Target::class);
     }
+
+    public function emailTemplate()
+    {
+        return $this->belongsTo(
+            EmailTemplate::class,
+            'email_template_id'
+        );
+    }
+
 }

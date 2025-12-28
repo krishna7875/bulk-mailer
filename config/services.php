@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'gmail' => [
+        'client_id'     => env('GOOGLE_GMAIL_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_GMAIL_CLIENT_SECRET'),
+        'redirect'      => env('GOOGLE_GMAIL_REDIRECT_URI'),
+    ],
+
+
 ];

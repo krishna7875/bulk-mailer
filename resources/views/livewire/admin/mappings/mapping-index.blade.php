@@ -23,6 +23,25 @@
                 </div>
             @endif
 
+            <div class="col-md-4">
+                <label class="form-label">Email Template</label>
+
+                <select class="form-select"
+                        wire:model="emailTemplateId">
+                    <option value="">Select template</option>
+
+                    @foreach($templates as $template)
+                        <option value="{{ $template->id }}">
+                            {{ $template->name }}
+                        </option>
+                    @endforeach
+                </select>
+
+                @error('emailTemplateId')
+                    <small class="text-danger">{{ $message }}</small>
+                @enderror
+            </div>
+
             <label class="form-label">Select Shooters</label>
 
             <div class="border rounded p-2"
@@ -58,7 +77,7 @@
         <div class="card-body p-2">
             <div class="row g-2">
                 <div class="col-md-3">
-                    <select wire:model="filterShooter" class="form-select form-select-sm">
+                    <select class="form-select form-select-sm" wire:model.live="filterShooter">
                         <option value="">All Shooters</option>
                         @foreach($shooters as $shooter)
                             <option value="{{ $shooter->id }}">
@@ -69,7 +88,7 @@
                 </div>
 
                 <div class="col-md-2">
-                    <select wire:model="filterStatus"  class="form-select form-select-sm">
+                    <select class="form-select form-select-sm" wire:model.live="filterStatus">
                         <option value="">All Status</option>
                         <option value="assigned">Assigned</option>
                         <option value="sent">Sent</option>
@@ -78,7 +97,7 @@
                 </div>
 
                 <div class="col-md-3">
-                   <input  wire:model="filterDate" type="date" class="form-control form-control-sm">
+                   <input type="date" class="form-control form-control-sm" wire:model.live="filterDate">
                 </div>
             </div>
         </div>
@@ -94,6 +113,7 @@
                             <th class="text-center">#</th>
                             <th>Shooter</th>
                             <th>Target</th>
+                            <th class="text-center">Template</th>
                             <th>Status</th>
                             <th>Date</th>
                             <th class="text-center">Actions</th>
@@ -108,6 +128,9 @@
                                 </td>
                                 <td>{{ $row->shooter_email }}</td>
                                 <td>{{ $row->target_email }}</td>
+                                <td class="text-center">
+                                    {{ $row->template_name ?? '-' }}
+                                </td>
                                 <td>{{ ucfirst($row->status) }}</td>
                                 <td>{{ $row->assigned_date }}</td>
                                 <td class="text-center">
@@ -128,26 +151,26 @@
                 </table>
             </div>
 
-          <div class="card-footer d-flex justify-content-between align-items-center">
-    <div class="text-muted">
-        Showing {{ $mappings->firstItem() }} to {{ $mappings->lastItem() }}
-        of {{ $mappings->total() }}
-    </div>
+            <div class="card-footer d-flex justify-content-between align-items-center">
+                <div class="text-muted">
+                    Showing {{ $mappings->firstItem() }} to {{ $mappings->lastItem() }}
+                    of {{ $mappings->total() }}
+                </div>
 
-    <div class="btn-group btn-group-sm">
-        <button class="btn btn-outline-secondary"
-                wire:click="previousPage"
-                @disabled($mappings->onFirstPage())>
-            ‹
-        </button>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary"
+                            wire:click="previousPage"
+                            @disabled($mappings->onFirstPage())>
+                        ‹
+                    </button>
 
-        <button class="btn btn-outline-secondary"
-                wire:click="nextPage"
-                @disabled(!$mappings->hasMorePages())>
-            ›
-        </button>
-    </div>
-</div>
+                    <button class="btn btn-outline-secondary"
+                            wire:click="nextPage"
+                            @disabled(!$mappings->hasMorePages())>
+                        ›
+                    </button>
+                </div>
+            </div>
 
 
         </div>

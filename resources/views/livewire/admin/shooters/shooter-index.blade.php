@@ -72,7 +72,7 @@
                             <td class="text-center text-truncate" title="{{ $shooter->email }}">{{ $shooter->email }}</td>
                             <td class="text-center">{{ $shooter->daily_quota }}</td>
                             <td class="text-center">
-                                <span class="badge bg-{{ 
+                                <span style="font-size:10px;" class="p-2 badge bg-{{ 
                                     $shooter->status === 'active' ? 'green' :
                                     ($shooter->status === 'paused' ? 'yellow' : 'red')
                                 }}">
@@ -80,18 +80,59 @@
                                 </span>
                             </td>
 
-                            <td class="text-center">
-                                <button class="btn btn-sm btn-icon btn-outline-primary me-2"
-                                        wire:click="edit({{ $shooter->id }})"
-                                        title="Edit">
-                                    <i class="ti ti-edit"></i>
-                                </button>
 
-                                <button class="btn btn-sm btn-icon btn-outline-danger"
-                                        onclick="confirmDelete('deleteShooter', {{ $shooter->id }})"
-                                        title="Delete">
-                                    <i class="ti ti-trash"></i>
-                                </button>
+                            <td class="text-center">
+                                <div class="d-flex align-items-center justify-content-center gap-2">
+
+                                    {{-- Edit --}}
+                                    <button class="p-1 btn btn-sm btn-icon btn-outline-primary"
+                                            wire:click="edit({{ $shooter->id }})"
+                                            title="Edit">
+                                        <i class="ti ti-edit"></i>
+                                    </button>
+
+                                    {{-- Delete --}}
+                                    <button class="p-1 btn btn-sm btn-icon btn-outline-danger"
+                                            onclick="confirmDelete('deleteShooter', {{ $shooter->id }})"
+                                            title="Delete">
+                                        <i class="ti ti-trash"></i>
+                                    </button>
+
+                                    {{-- Gmail Integration --}}
+                                    @if($shooter->gmail_connected_at)
+                                        {{-- CONNECTED (non-actionable) --}}
+                                        <span
+                                            class="p-1 btn btn-sm btn-icon bg-success text-white border-0"
+                                            title="Gmail Connected"
+                                            style="cursor: default;"
+                                        >
+                                            <i class="ti ti-mail"></i>
+                                        </span>
+
+                                    @elseif($shooter->gmail_token_expires_at && $shooter->gmail_token_expires_at->isPast())
+                                        {{-- EXPIRED --}}
+                                        <a
+                                            href="{{ route('shooters.gmail.connect', $shooter) }}"
+                                            class="p-1 btn btn-sm btn-icon btn-outline-warning"
+                                            title="Gmail access expired – reconnect required"
+                                        >
+                                            <i class="ti ti-mail"></i>
+                                        </a>
+
+                                    @else
+                                        {{-- NOT CONNECTED --}}
+                                        <a
+                                            href="{{ route('shooters.gmail.connect', $shooter) }}"
+                                            class="p-1 btn btn-sm btn-icon btn-outline-primary"
+                                            title="Connect Gmail"
+                                        >
+                                            <i class="ti ti-mail"></i>
+                                        </a>
+                                    @endif
+
+
+                                </div>
+
                             </td>
 
                         </tr>
