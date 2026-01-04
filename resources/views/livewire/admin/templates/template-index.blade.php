@@ -65,7 +65,7 @@
     {{-- MODAL --}}
     @if($showModal)
         <div class="modal modal-blur fade show d-block">
-            <div class="modal-dialog modal-lg">
+            <div class="modal-dialog modal-xl">
                 <div class="modal-content">
 
                     <div class="modal-header">
@@ -83,6 +83,27 @@
                         @error('name')
                             <small class="text-danger">{{ $message }}</small>
                         @enderror
+
+                        <div class="m-2">
+                            <div class="d-flex flex-wrap gap-1 text-sm">
+                                <h6> Mapped Variables : </h6>
+                                @foreach($allowedVariables as $var)
+                                    @php
+                                        $placeholder = '{{ ' . $var . ' }}';
+                                    @endphp
+
+                                    <code
+                                        class="px-2 py-1 border rounded bg-light"
+                                        style="cursor:pointer"
+                                        title="Click to copy"
+                                        onclick="navigator.clipboard.writeText(@js($placeholder))"
+                                    >
+                                        {{ $placeholder }}
+                                    </code>
+
+                                @endforeach
+                            </div>
+                        </div>
 
                         <input class="form-control mb-1"
                             placeholder="Subject"
@@ -106,6 +127,22 @@
                             <option value="inactive">Inactive</option>
                         </select>
 
+                        @if($existingAttachment)
+                            <div class="mb-2">
+                                <span class="badge">
+                                    Attached:
+                                    {{ $existingAttachment['name'] }}
+                                    ({{ number_format($existingAttachment['size'] / 1024, 1) }} KB)
+                                </span>
+
+                                <button class="p-1 btn btn-sm btn-icon btn-outline-danger"
+                                        wire:click="removeExistingAttachment"
+                                        title="Remove Attachment">
+                                    <i class="ti ti-trash"></i>
+                                </button>
+                               
+                            </div>
+                        @endif
                         <input type="file"
                             class="form-control"
                             wire:model="attachment">
@@ -115,6 +152,7 @@
 
                     </div>
 
+                    
                     <div class="modal-footer">
                         <button class="btn btn-outline-secondary" wire:click="preview">
                             Preview

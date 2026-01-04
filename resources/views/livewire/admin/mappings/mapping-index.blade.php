@@ -12,6 +12,9 @@
                         class="form-control form-control-sm"
                         wire:model.live.debounce.300ms="assignedDate">
                 </div>
+                @error('assignedDate')
+                    <small class="text-danger">{{ $message }}</small>
+                @enderror
             </div>
             @if($availableTargetsCount > 0)
                 <div class="text-muted mb-2">
@@ -42,7 +45,7 @@
                 @enderror
             </div>
 
-            <label class="form-label">Select Shooters</label>
+            <label class="form-label">Select Shooters (only gmail connected shooters will be listed here with)</label>
 
             <div class="border rounded p-2"
                 style="max-height:220px; overflow-y:auto;">
@@ -62,7 +65,12 @@
                         </label>
                     </div>
                 @endforeach
+
+                @error('selectedShooters')
+                    <small class="text-danger">{{ $message }}</small>
+                @enderror       
             </div>
+          
 
             <button class="btn btn-primary btn-sm mt-2"
                     wire:click="generate"

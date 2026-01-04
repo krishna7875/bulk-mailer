@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Carbon\Carbon;
 
 class Shooter extends Model
 {
@@ -24,11 +25,30 @@ class Shooter extends Model
     protected $casts = [
         'refresh_token' => 'encrypted',
         'last_quota_date' => 'date',
+        'gmail_token_expires_at' => 'datetime',
+        'gmail_connected_at'     => 'datetime',
     ];
 
     public function mappings()
     {
         return $this->hasMany(ShooterTargetMapping::class);
+    }
+
+    public function getGmailStatusAttribute(): string
+    {
+        if (!$this->gmail_refresh_token) {
+            return 'not_connected';
+        }
+
+        if (!$this->gmail_token_expires_at) {
+            return 'expired';
+        }
+
+        if (Carbon::parse($this->gmail_token_expires_at)->isPast()) {
+            return 'expired';
+        }
+
+        return 'connected';
     }
 
 }

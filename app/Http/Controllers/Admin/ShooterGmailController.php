@@ -79,6 +79,8 @@ class ShooterGmailController extends Controller
         ]);
 
         session()->forget('gmail_shooter_id');
+        session()->flash('gmail_connected', true);
+
 
         return redirect()
             ->route('shooters.index')

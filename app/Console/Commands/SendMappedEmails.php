@@ -3,132 +3,154 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use App\Models\Shooter;
-use App\Models\ShooterTargetMapping;
-use App\Models\Target;
-use App\Services\Gmail\GmailClient;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Exception;
+use App\Models\ShooterTargetMapping;
+use App\Services\EmailRenderService;
+use App\Services\GmailSendService;
+use Carbon\Carbon;
 
 class SendMappedEmails extends Command
 {
-    protected $signature = 'emails:send {--date=}';
-    protected $description = 'Send mapped emails for shooters based on daily quota';
+    protected $signature = 'emails:send-mapped';
+    protected $description = 'Send assigned shooter-target mapped emails';
 
-    public function handle(): int
-    {
-        $date = $this->option('date')
-            ? now()->parse($this->option('date'))->toDateString()
-            : now()->toDateString();
+    public function handle(
+        EmailRenderService $renderer,
+        GmailSendService $gmail
+    ) {
+        Log::info('SendMappedEmails started');
 
-        Log::info('Email sending started', ['date' => $date]);
-        
-        $shooters = Shooter::whereNotNull('gmail_connected_at')->get();
-        Log::info('Email sending started', ['shooters' => $shooters]);
-        
-        if($shooters->isEmpty()){
-            Log::info('There is no active gmail connected shooter is available.');
-        }else{
-            foreach ($shooters as $shooter) {
-                $this->processShooter($shooter, $date);
+        $today = now()->toDateString();
+
+        /**
+         * Step 1: Fetch eligible mappings
+         */
+        $mappings = ShooterTargetMapping::query()
+            ->with(['shooter', 'target', 'emailTemplate'])
+            ->where('status', 'assigned')
+            ->whereDate('assigned_date', $today)
+            ->whereNotNull('email_template_id')
+            ->orderBy('id')
+            ->limit(50) // HARD SAFETY LIMIT
+            ->get();
+
+        if ($mappings->isEmpty()) {
+            Log::info('No eligible mappings found');
+            return Command::SUCCESS;
+        }
+
+        foreach ($mappings as $mapping) {
+            DB::beginTransaction();
+
+            try {
+                $shooter = $mapping->shooter;
+
+                /**
+                 * Step 2: Gmail connection check
+                 */
+                if (
+                    !$shooter->gmail_connected_at ||
+                    !$shooter->gmail_refresh_token
+                ) {
+                    $this->failMapping(
+                        $mapping,
+                        'Gmail not connected | token expired or revoked. Reconnect required.'
+                    );
+                    DB::commit();
+                    continue;
+                }
+
+                /**
+                 * Step 3: Daily quota enforcement
+                 */
+                $sentToday = ShooterTargetMapping::query()
+                    ->where('shooter_id', $shooter->id)
+                    ->whereDate('sent_at', $today)
+                    ->count();
+
+                if ($sentToday >= $shooter->daily_quota) {
+                    Log::info('Shooter quota reached', [
+                        'shooter_id' => $shooter->id
+                    ]);
+                    DB::commit();
+                    continue;
+                }
+
+                /**
+                 * Step 4: Render email
+                 */
+                $payload = $renderer->render($mapping);
+
+                /**
+                 * Step 5: Send email
+                 */
+                $gmail->send(
+                    $shooter,
+                    $payload['to'],
+                    $payload['subject'],
+                    $payload['body'],
+                    $payload['attachment']
+                );
+
+                /**
+                 * Step 6: Update statuses
+                 */
+                $mapping->update([
+                    'status'       => 'sent',
+                    'sent_at'      => now(),
+                    'attempted_at' => now(),
+                ]);
+
+                $mapping->target->update([
+                    'status' => 'sent',
+                ]);
+
+                DB::commit();
+
+            } catch (\Throwable $e) {
+                DB::rollBack();
+
+                Log::error('Email send failed', [
+                    'mapping_id' => $mapping->id,
+                    'error'      => $e->getMessage(),
+                ]);
+
+                $this->failMapping(
+                    $mapping,
+                    $e->getMessage()
+                );
+
+                // 🔴 HARD STOP if token related
+                if (
+                    str_contains($e->getMessage(), 'refresh') ||
+                    str_contains($e->getMessage(), 'token')
+                ) {
+                    Log::error('Stopping send process due to Gmail auth failure', [
+                        'shooter_id' => $mapping->shooter_id,
+                        'error'      => $e->getMessage(),
+                    ]);
+
+                    return; // EXIT command safely
+                }
+
+                continue;
             }
         }
 
-        Log::info('Email sending completed', ['date' => $date]);
+        Log::info('SendMappedEmails finished');
 
         return Command::SUCCESS;
     }
 
-    protected function processShooter(Shooter $shooter, string $date): void
-    {
-        Log::info('SendMappedEmails::processShooter() start');
-        
-        $dailyQuota = $shooter->daily_quota;
-        Log::info('dailyQuota = '.$dailyQuota);
-        
-        $alreadySent = ShooterTargetMapping::where('shooter_id', $shooter->id)
-        ->whereDate('sent_at', $date)
-        ->count();
-        Log::info('alreadySent = '.$alreadySent);
-        
-        $remainingQuota = max(0, $dailyQuota - $alreadySent);
-        Log::info('remainingQuota = '.$remainingQuota);
-        
-        if ($remainingQuota <= 0) {
-            Log::info('Shooter quota exhausted', [
-                'shooter_id' => $shooter->id,
-            ]);
-            return;
-        }
-        
-        $mappings = ShooterTargetMapping::where('shooter_id', $shooter->id)
-        ->where('assigned_date', $date)
-        ->where('status', 'assigned')
-        ->limit($remainingQuota)
-        ->get();
-
-        Log::info('mappings = '.json_encode($mappings));
-
-        if ($mappings->isEmpty()) {
-            return;
-        }
-
-        Log::info('Processing shooter mappings', [
-            'shooter_id' => $shooter->id,
-            'count' => $mappings->count(),
+    protected function failMapping(
+        ShooterTargetMapping $mapping,
+        string $reason
+    ): void {
+        $mapping->update([
+            'status'        => 'failed',
+            'error_message' => $reason,
+            'attempted_at'  => now(),
         ]);
-
-        $gmail = (new GmailClient())->forShooter($shooter);
-
-        foreach ($mappings as $mapping) {
-            $this->sendSingle($gmail, $mapping);
-        }
-
-        Log::info('SendMappedEmails::processShooter() end');
-
     }
-
-    protected function sendSingle(GmailClient $gmail, ShooterTargetMapping $mapping): void
-    {
-        
-        try {
-            $mapping->update([
-                'status' => 'assigned', // stays assigned until success
-                'attempted_at' => now(),
-            ]);
-
-            $target = Target::findOrFail($mapping->target_id);
-
-            $gmail->send(
-                $target->email,
-                'Hello from Bulk Mailer',
-                '<p>This is a test email.</p>'
-            );
-
-            $mapping->update([
-                'status' => 'sent',
-                'sent_at' => now(),
-            ]);
-
-            $target->update([
-                'status' => 'sent',
-            ]);
-
-        } catch (Exception $e) {
-            Log::error('Email send failed', [
-                'mapping_id' => $mapping->id,
-                'error' => $e->getMessage(),
-            ]);
-
-            $mapping->update([
-                'status' => 'failed',
-                'error_message' => $e->getMessage(),
-            ]);
-
-            Target::where('id', $mapping->target_id)->update([
-                'status' => 'failed',
-            ]);
-        }
-    }
-
 }

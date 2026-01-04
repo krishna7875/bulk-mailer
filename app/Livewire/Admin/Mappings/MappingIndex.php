@@ -309,7 +309,7 @@ class MappingIndex extends Component
             ->paginate(10);
 
 
-            $shooters = Shooter::where('status', 'active')
+            $shooters = Shooter::where('status', 'active')->whereNotNull('gmail_connected_at')
                 ->get()
                 ->map(function ($shooter) {
 

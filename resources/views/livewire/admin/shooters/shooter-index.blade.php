@@ -99,7 +99,10 @@
                                     </button>
 
                                     {{-- Gmail Integration --}}
-                                    @if($shooter->gmail_connected_at)
+
+                                    @php $gmailStatus = $shooter->gmail_status; @endphp
+
+                                    @if($gmailStatus === 'connected')
                                         {{-- CONNECTED (non-actionable) --}}
                                         <span
                                             class="p-1 btn btn-sm btn-icon bg-success text-white border-0"
@@ -109,7 +112,7 @@
                                             <i class="ti ti-mail"></i>
                                         </span>
 
-                                    @elseif($shooter->gmail_token_expires_at && $shooter->gmail_token_expires_at->isPast())
+                                    @elseif($gmailStatus === 'expired')
                                         {{-- EXPIRED --}}
                                         <a
                                             href="{{ route('shooters.gmail.connect', $shooter) }}"
@@ -129,7 +132,6 @@
                                             <i class="ti ti-mail"></i>
                                         </a>
                                     @endif
-
 
                                 </div>
 
@@ -215,3 +217,9 @@
         <div class="modal-backdrop fade show"></div>
     @endif
 </div>
+
+@if(session()->has('gmail_connected'))
+    <script>
+        Livewire.dispatch('refreshShooters');
+    </script>
+@endif

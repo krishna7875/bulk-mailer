@@ -9,6 +9,7 @@ use App\Models\EmailTemplate;
 use App\Services\EmailTemplateAttachmentService;
 use App\Support\EmailTemplateVariables;
 use App\Support\EmailTemplatePreviewData;
+use Log;
 
 
 class TemplateIndex extends Component
@@ -32,6 +33,9 @@ class TemplateIndex extends Component
     public $previewBody;
     public $showPreview = false;
 
+    public $existingAttachment = null;
+    public $removeAttachment = false;
+
 
     protected function rules()
     {
@@ -52,12 +56,26 @@ class TemplateIndex extends Component
         }
     }
 
+    public function removeExistingAttachment()
+    {
+        $this->removeAttachment = true;
+        $this->existingAttachment = null;
+    }
 
     public function render()
     {
+        $availableVars = EmailTemplateVariables::allowed();
+        // $filteredVars = array_values(array_diff($availableVars, ['target_status','shooter_daily_quota', '', 'now', 'app_name']));
+        $filteredVars = array_slice($availableVars, 0, 3);
+
+
+        Log::info($availableVars);
+
         return view('livewire.admin.templates.template-index', [
             'templates' => EmailTemplate::latest()->paginate(10),
+            'allowedVariables' => $filteredVars,
         ]);
+
     }
 
     public function create()
@@ -76,6 +94,15 @@ class TemplateIndex extends Component
         $this->body = $template->body;
         $this->status = $template->status;
 
+        if ($template->attachment_path) {
+            $this->existingAttachment = [
+                'path' => $template->attachment_path,
+                'name' => $template->attachment_name,
+                'size' => $template->attachment_size,
+            ];
+        }
+
+        $this->removeAttachment = false;
         $this->showModal = true;
     }
 
@@ -108,6 +135,20 @@ class TemplateIndex extends Component
             ]
         );
 
+        /* Remove attachment if requested */
+        if ($this->removeAttachment) {
+            app(EmailTemplateAttachmentService::class)
+                ->deleteIfExists($template->attachment_path);
+
+            $template->update([
+                'attachment_path' => null,
+                'attachment_name' => null,
+                'attachment_mime' => null,
+                'attachment_size' => null,
+            ]);
+        }
+
+        /* Replace attachment if new uploaded */
         if ($this->attachment) {
             $service = app(EmailTemplateAttachmentService::class);
 
@@ -145,10 +186,11 @@ class TemplateIndex extends Component
             'body',
             'status',
             'attachment',
+            'existingAttachment',
+            'removeAttachment',
         ]);
         $this->resetValidation();
     }
-
 
     public function preview()
     {
