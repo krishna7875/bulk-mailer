@@ -73,7 +73,6 @@ class ShooterIndex extends Component
         ]);
     }
 
-
     public function edit($id)
     {
         $this->resetValidation();

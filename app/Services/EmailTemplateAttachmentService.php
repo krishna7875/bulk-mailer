@@ -12,11 +12,7 @@ class EmailTemplateAttachmentService
     /**
      * Allowed file extensions
      */
-    protected array $allowedExtensions = [
-        'pdf',
-        'png', 'jpg', 'jpeg', 'svg',
-        'doc', 'docx',
-    ];
+    protected array $allowedExtensions = [ 'pdf', 'png', 'jpg', 'jpeg', 'svg', 'doc', 'docx',];
 
     /**
      * Max size in KB (10 MB)
