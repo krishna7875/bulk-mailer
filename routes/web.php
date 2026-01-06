@@ -11,8 +11,6 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ReportsController;
 use App\Http\Controllers\Admin\EmailTemplateController;
 
-
-
 /*
 |--------------------------------------------------------------------------
 | Public Route (Redirect to login)
@@ -58,7 +56,6 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/oauth/gmail/callback', [ShooterGmailController::class, 'callback'])
         ->name('shooters.gmail.callback');
-
     });
 });
 
