@@ -114,7 +114,7 @@ class GmailSendService
             "MIME-Version: 1.0",
         ];
 
-        if ($attachment) {
+        if ($attachment && file_exists($attachment['path'])) {
 
             $headers[] = "Content-Type: multipart/mixed; boundary=\"{$boundary}\"";
 
@@ -125,14 +125,13 @@ class GmailSendService
             $message .= nl2br($body) . "\r\n";
 
             // ── ATTACHMENT PART ───────────────────────
-            $fileData = base64_encode(file_get_contents($attachment['path']));
-            $fileData = chunk_split($fileData);
-
             $message .= "--{$boundary}\r\n";
             $message .= "Content-Type: {$attachment['mime']}; name=\"{$attachment['name']}\"\r\n";
             $message .= "Content-Disposition: attachment; filename=\"{$attachment['name']}\"\r\n";
             $message .= "Content-Transfer-Encoding: base64\r\n\r\n";
-            $message .= $fileData . "\r\n";
+            
+            // Optimization: Direct read-encode-append to avoid extra variable copy
+            $message .= chunk_split(base64_encode(file_get_contents($attachment['path']))) . "\r\n";
 
             // ── END ───────────────────────────────────
             $message .= "--{$boundary}--";

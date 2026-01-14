@@ -79,9 +79,12 @@ class MappingIndex extends Component
     /**
      * Generate mappings respecting daily quota
     */
+    /**
+     * Generate mappings respecting daily quota (Bulk Optimized)
+    */
     public function generate()
     {
-        Log::info('MappingIndex::generate()');
+        Log::info('MappingIndex::generate() - Bulk Optimized');
 
         $this->validate([
             'selectedShooters'  => 'required|array|min:1',
@@ -89,83 +92,147 @@ class MappingIndex extends Component
             'emailTemplateId'   => 'required|exists:email_templates,id',
         ]);
 
-        DB::beginTransaction();
+        // DB::beginTransaction(); // Moved to write phase
 
         try {
             if (!$this->emailTemplateId) {
-                $this->dispatch('swal', [
+                // ... warning alert code ... (keeping concise for reading)
+                 $this->dispatch('swal', [
                     'type'  => 'warning',
                     'title' => 'Template Required',
                     'html'  => 'Please select an email template before generating mappings.',
                 ]);
+                // DB::rollBack(); // Not started yet
                 return;
             }
 
             $date = Carbon::parse($this->assignedDate)->toDateString();
-            $totalAssigned = 0;
+            
+            // 1. Bulk fetch shooters
+            $shooters = Shooter::whereIn('id', $this->selectedShooters)
+                ->where('status', 'active')
+                ->get();
 
-            foreach ($this->selectedShooters as $shooterId) {
-
-                $shooter = Shooter::where('id', $shooterId)
-                    ->where('status', 'active')
-                    ->first();
-
-                if (!$shooter) {
-                    continue;
-                }
-
-                // Already assigned today
-                $alreadyAssigned = DB::table('shooter_target_mappings')
-                    ->where('shooter_id', $shooter->id)
-                    ->where('assigned_date', $date)
-                    ->count();
-
-                $remainingQuota = max(0, $shooter->daily_quota - $alreadyAssigned);
-
-                if ($remainingQuota === 0) {
-                    continue;
-                }
-
-                // Eligible targets
-                $targets = Target::query()
-                    ->where('status', 'unsent')
-                    ->whereNotIn('id', function ($q) use ($date) {
-                        $q->select('target_id')
-                          ->from('shooter_target_mappings')
-                          ->where('assigned_date', $date);
-                    })
-                    ->limit($remainingQuota)
-                    ->pluck('id');
-
-                if ($targets->isEmpty()) {
-                    break;
-                }
-
-                $now = now();
-
-                $rows = $targets->map(fn ($targetId) => [
-                    'shooter_id'    => $shooter->id,
-                    'target_id'     => $targetId,
-                    'email_template_id' => $this->emailTemplateId,
-                    'assigned_date' => $date,
-                    'status'        => 'assigned',
-                    'assigned_at'   => $now,
-                    'created_at'    => $now,
-                    'updated_at'    => $now,
-                ])->toArray();
-
-                DB::table('shooter_target_mappings')->insert($rows);
-
-                $totalAssigned += count($rows);
+            if ($shooters->isEmpty()) {
+                 // DB::rollBack(); // Not started yet
+                 return;
             }
 
-            DB::commit();
+            // 2. Bulk fetch usage for today
+            $usageMap = DB::table('shooter_target_mappings')
+                ->selectRaw('shooter_id, count(*) as count')
+                ->whereIn('shooter_id', $shooters->pluck('id'))
+                ->where('assigned_date', $date)
+                ->groupBy('shooter_id')
+                ->pluck('count', 'shooter_id');
 
-            if ($totalAssigned === 0) {
-                $this->dispatch('swal', [
+            // 3. Calculate total needed and prepare distribution needs
+            $shooterNeeds = [];
+            $totalNeeded = 0;
+
+            foreach ($shooters as $shooter) {
+                $used = $usageMap->get($shooter->id, 0);
+                $needed = max(0, $shooter->daily_quota - $used);
+
+                if ($needed > 0) {
+                    $shooterNeeds[] = [
+                        'shooter' => $shooter,
+                        'needed' => $needed
+                    ];
+                    $totalNeeded += $needed;
+                }
+            }
+
+            if ($totalNeeded === 0) {
+                DB::commit(); // Nothing to do
+                return;
+            }
+
+            // 4. Bulk fetch targets (Global exclusion for the day)
+            // Note: This matches the original logic: "whereNotIn ... mappings where assigned_date = $date"
+            // We fetch enough targets for everyone.
+            // 4. Bulk fetch targets (Global exclusion for the day)
+            // Optimization: Use LEFT JOIN ... IS NULL instead of whereNotIn subquery
+            $targets = Target::query()
+                ->select('targets.id')
+                ->leftJoin('shooter_target_mappings as stm', function ($join) use ($date) {
+                    $join->on('targets.id', '=', 'stm.target_id')
+                         ->where('stm.assigned_date', '=', $date);
+                })
+                ->where('targets.status', 'unsent')
+                ->whereNull('stm.id')
+                ->limit($totalNeeded)
+                ->get();
+
+            if ($targets->isEmpty()) {
+                // Handle no targets case
+                DB::commit(); // Commit empty transaction (no changes)
+                 $this->dispatch('swal', [
                     'type'  => 'warning',
                     'title' => 'No Targets Available',
                     'html'  => 'There are no eligible targets left for mapping.',
+                ]);
+                return;
+            }
+
+            // 5. Distribute targets
+            $insertData = [];
+            $targetIndex = 0;
+            $now = now();
+            $targetsCount = $targets->count();
+            
+            foreach ($shooterNeeds as $item) {
+                $needed = $item['needed'];
+                $shooterId = $item['shooter']->id;
+
+                for ($i = 0; $i < $needed; $i++) {
+                    if ($targetIndex >= $targetsCount) {
+                        break 2; // Run out of targets
+                    }
+
+                    $insertData[] = [
+                        'shooter_id'        => $shooterId,
+                        'target_id'         => $targets[$targetIndex]->id,
+                        'email_template_id' => $this->emailTemplateId,
+                        'assigned_date'     => $date,
+                        'status'            => 'assigned',
+                        'assigned_at'       => $now,
+                        'created_at'        => $now,
+                        'updated_at'        => $now,
+                    ];
+                    
+                    $targetIndex++;
+                }
+            }
+
+            // 6. Bulk Insert
+            if (!empty($insertData)) {
+                
+                // Start transaction ONLY for the write operation
+                DB::beginTransaction();
+                
+                try {
+                    // Chunking insert to be safe with placeholders if needed, though usually safe for ~50-100 items. 
+                    // Using 500 chunk just in case.
+                    foreach (array_chunk($insertData, 500) as $chunk) {
+                        DB::table('shooter_target_mappings')->insert($chunk);
+                    }
+                    
+                    DB::commit();
+
+                } catch (\Throwable $e) {
+                    DB::rollBack();
+                    throw $e; // Re-throw to be caught by outer catch
+                }
+            }
+
+            $totalAssigned = count($insertData);
+
+            if ($totalAssigned === 0) {
+                 $this->dispatch('swal', [
+                    'type'  => 'warning',
+                    'title' => 'No Targets Available',
+                    'html'  => 'Available targets were exhausted.',
                 ]);
                 return;
             }
@@ -225,10 +292,13 @@ class MappingIndex extends Component
 
     protected function availableTargetsCount(): int
     {
-        return \App\Models\Target::where('status', 'unsent')
-            ->whereDoesntHave('mappings', function ($q) {
-                $q->where('assigned_date', $this->assignedDate);
+        return \App\Models\Target::query()
+            ->leftJoin('shooter_target_mappings as stm', function ($join) {
+                $join->on('targets.id', '=', 'stm.target_id')
+                     ->where('stm.assigned_date', '=', $this->assignedDate);
             })
+            ->where('targets.status', 'unsent')
+            ->whereNull('stm.id')
             ->count();
     }
 

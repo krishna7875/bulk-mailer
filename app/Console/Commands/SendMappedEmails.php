@@ -126,12 +126,12 @@ class SendMappedEmails extends Command
                     str_contains($e->getMessage(), 'refresh') ||
                     str_contains($e->getMessage(), 'token')
                 ) {
-                    Log::error('Stopping send process due to Gmail auth failure', [
+                    Log::warning('Skipping shooter due to Gmail auth failure', [
                         'shooter_id' => $mapping->shooter_id,
                         'error'      => $e->getMessage(),
                     ]);
 
-                    return; // EXIT command safely
+                    // removed return; to allow other shooters to process
                 }
 
                 continue;
