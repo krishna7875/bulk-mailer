@@ -41,11 +41,12 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/reports/mappings', [ReportsController::class, 'mappings'])->name('reports.mappings');
         
         Route::get('/email-templates', [EmailTemplateController::class, 'index'])->name('email-templates.index');
+    Route::get('/users', [UserController::class, 'index'])->name('users.index');
     });
     
     // ONLY SUPER ADMIN
     Route::middleware('role:super_admin')->group(function () {
-        Route::resource('users', UserController::class);
+
         
         Route::get('/shooters', [ShooterController::class, 'index'])->name('shooters.index');
         Route::get('/targets', [TargetController::class, 'index'])->name('targets.index');
