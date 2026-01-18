@@ -116,6 +116,12 @@ Follow these steps to get the project running locally.
     php artisan queue:listen
     ```
 
+8.  **First Time Login**
+    After running the migrations (which includes the setup seeder), you can login with the following credentials:
+    *   **Email:** `test@example.com`
+    *   **Password:** `password`
+    *   **Role:** `super_admin`
+
 ### Example .env Keys
 (Ensure these are present in your `.env`)
 
@@ -123,14 +129,14 @@ Follow these steps to get the project running locally.
 APP_NAME="Bulk Mailer"
 APP_URL=http://localhost:8000
 
-DB_CONNECTION=sqlite
+#DB_CONNECTION=sqlite
 # OR
-# DB_CONNECTION=mysql
-# DB_HOST=127.0.0.1
-# DB_PORT=3306
-# DB_DATABASE=bulk_mailer
-# DB_USERNAME=root
-# DB_PASSWORD=
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=bulk_mailer
+DB_USERNAME=root
+DB_PASSWORD=
 
 # Google Project Credentials
 GOOGLE_GMAIL_CLIENT_ID=
